@@ -668,6 +668,67 @@ mod tests {
 
         assert_eq!(extract_client_ip(&headers, None, false), "unknown");
     }
+
+    // ── metrics_auth_middleware ───────────────────────────────────────────────
+
+    fn metrics_app(config: Arc<MetricsAuthConfig>) -> axum::Router {
+        use axum::{routing::get, Router};
+        Router::new()
+            .route("/metrics", get(|| async { "ok" }))
+            .layer(middleware::from_fn_with_state(config, metrics_auth_middleware))
+    }
+
+    fn metrics_config(public: bool, allowlist: Vec<&str>, keys: Vec<&str>) -> Arc<MetricsAuthConfig> {
+        Arc::new(MetricsAuthConfig::new(
+            public,
+            allowlist.iter().filter_map(|s| s.parse().ok()).collect(),
+            Arc::new(ApiKeyAuth::new(keys.iter().map(|s| s.to_string()).collect())),
+        ))
+    }
+
+    async fn get_metrics(app: axum::Router, api_key: Option<&str>) -> StatusCode {
+        use axum::{body::Body, http::Request};
+        use tower::ServiceExt;
+        let mut builder = Request::builder().uri("/metrics");
+        if let Some(k) = api_key {
+            builder = builder.header("x-api-key", k);
+        }
+        app.oneshot(builder.body(Body::empty()).unwrap())
+            .await
+            .unwrap()
+            .status()
+    }
+
+    #[tokio::test]
+    async fn metrics_public_mode_allows_unauthenticated() {
+        let app = metrics_app(metrics_config(true, vec![], vec!["secret"]));
+        assert_eq!(get_metrics(app, None).await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn metrics_requires_api_key_when_not_public() {
+        let app = metrics_app(metrics_config(false, vec![], vec!["secret"]));
+        assert_eq!(get_metrics(app, None).await, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn metrics_valid_api_key_grants_access() {
+        let app = metrics_app(metrics_config(false, vec![], vec!["secret"]));
+        assert_eq!(get_metrics(app, Some("secret")).await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn metrics_wrong_api_key_rejected() {
+        let app = metrics_app(metrics_config(false, vec![], vec!["secret"]));
+        assert_eq!(get_metrics(app, Some("wrong")).await, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn metrics_ip_not_in_allowlist_rejected() {
+        // allowlist contains only 10.0.0.1; request comes from 127.0.0.1 (no ConnectInfo)
+        let app = metrics_app(metrics_config(false, vec!["10.0.0.1"], vec!["secret"]));
+        assert_eq!(get_metrics(app, Some("secret")).await, StatusCode::FORBIDDEN);
+    }
 }
 
 /// Middleware to propagate trace context from incoming requests

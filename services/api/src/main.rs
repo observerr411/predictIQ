@@ -9,7 +9,7 @@ use predictiq_api::{
     idempotency, correlation, versioning, validation, rate_limit, audit_middleware,
     metrics::Metrics,
     newsletter::IpRateLimiter,
-    security::{self, ApiKeyAuth, IpWhitelist, RateLimiter},
+    security::{self, ApiKeyAuth, IpWhitelist, MetricsAuthConfig, RateLimiter},
     shutdown::{wait_for_signal, ShutdownCoordinator},
     tracing_config, compression,
     AppState,
@@ -177,7 +177,6 @@ async fn main() -> anyhow::Result<()> {
     // ── Routes ────────────────────────────────────────────────────────────────
     let public_routes = Router::new()
         .route("/health", get(handlers::health))
-        .route("/metrics", get(handlers::metrics))
         .route("/api/v1/blockchain/health", get(handlers::blockchain_health))
         .route("/api/v1/blockchain/markets/:market_id", get(handlers::blockchain_market_data))
         .route("/api/v1/blockchain/stats", get(handlers::blockchain_platform_stats))
@@ -197,6 +196,21 @@ async fn main() -> anyhow::Result<()> {
             (rate_limiter.clone(), security::TrustProxy(config_trust_proxy)),
             security::global_rate_limit_middleware,
         ))
+        .with_state(state.clone());
+
+    let metrics_auth_config = Arc::new(MetricsAuthConfig::new(
+        state.config.metrics_public,
+        state.config.metrics_allowlist_ips.clone(),
+        api_key_auth.clone(),
+    ));
+    let metrics_routes = Router::new()
+        .route("/metrics", get(handlers::metrics))
+        .layer(middleware::from_fn_with_state(
+            metrics_auth_config,
+            security::metrics_auth_middleware,
+        ))
+        .layer(middleware::from_fn(correlation::correlation_id_middleware))
+        .layer(TraceLayer::new_for_http())
         .with_state(state.clone());
 
     let newsletter_routes = Router::new()
@@ -294,6 +308,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .merge(public_routes)
+        .merge(metrics_routes)
         .merge(newsletter_routes)
         .merge(webhook_routes)
         .merge(admin_routes)
