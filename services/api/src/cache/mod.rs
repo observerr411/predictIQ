@@ -286,32 +286,50 @@ impl RedisCache {
         .await
     }
 
+    /// Delete all keys matching `pattern` using non-blocking cursor-based SCAN.
+    ///
+    /// Each SCAN+DEL batch acquires and releases its own pool connection so no
+    /// single connection is held for the full duration of a large-keyspace scan.
+    /// The circuit breaker is checked once before the loop; individual batch
+    /// errors are propagated immediately.
     pub async fn del_by_pattern(&self, pattern: &str) -> anyhow::Result<usize> {
+        if !self.cb.allow() {
+            anyhow::bail!("Redis circuit breaker is open");
+        }
+
+        let mut cursor: u64 = 0;
+        let mut total_deleted: usize = 0;
         let pattern = pattern.to_owned();
-        self.exec(|mut conn| async move {
-            let mut cursor: u64 = 0;
-            let mut total_deleted: usize = 0;
-            loop {
-                let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
-                    .arg(cursor)
-                    .arg("MATCH")
-                    .arg(&pattern)
-                    .arg("COUNT")
-                    .arg(100u64)
-                    .query_async(&mut conn)
-                    .await?;
-                if !keys.is_empty() {
-                    let deleted: usize = conn.del(keys).await?;
-                    total_deleted += deleted;
-                }
-                cursor = next_cursor;
-                if cursor == 0 {
-                    break;
-                }
+
+        loop {
+            let pattern_clone = pattern.clone();
+            let (next_cursor, batch_deleted) = self
+                .exec(|mut conn| async move {
+                    let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                        .arg(cursor)
+                        .arg("MATCH")
+                        .arg(&pattern_clone)
+                        .arg("COUNT")
+                        .arg(100u64)
+                        .query_async(&mut conn)
+                        .await?;
+                    let deleted = if keys.is_empty() {
+                        0
+                    } else {
+                        conn.del(keys).await?
+                    };
+                    Ok((next_cursor, deleted))
+                })
+                .await?;
+
+            total_deleted += batch_deleted;
+            cursor = next_cursor;
+            if cursor == 0 {
+                break;
             }
-            Ok(total_deleted)
-        })
-        .await
+        }
+
+        Ok(total_deleted)
     }
 
     /// Fetch-or-set with stampede protection.
@@ -477,6 +495,45 @@ mod tests {
         }
         let other: Option<u32> = cache.get_json("other:item:0").await.unwrap();
         assert_eq!(other, Some(100));
+    }
+
+    /// Verifies that del_by_pattern correctly handles a keyspace larger than a
+    /// single SCAN page (COUNT 100), exercising the cursor-batching loop.
+    #[tokio::test]
+    async fn del_by_pattern_large_keyspace_uses_cursor_batching() {
+        let (cache, _c) = start_cache().await;
+        let n = 250u32; // exceeds the COUNT 100 hint, forcing multiple SCAN rounds
+        for i in 0..n {
+            cache
+                .set_json(&format!("large:item:{i}"), &i, Duration::from_secs(60))
+                .await
+                .unwrap();
+        }
+        // One key outside the pattern must survive.
+        cache
+            .set_json("large:other:0", &999u32, Duration::from_secs(60))
+            .await
+            .unwrap();
+
+        let deleted = cache.del_by_pattern("large:item:*").await.unwrap();
+        assert_eq!(deleted, n as usize, "all {n} matching keys must be deleted");
+
+        // Spot-check a few keys are gone.
+        for i in [0u32, 99, 100, 249] {
+            let v: Option<u32> = cache.get_json(&format!("large:item:{i}")).await.unwrap();
+            assert!(v.is_none(), "large:item:{i} must be gone after del_by_pattern");
+        }
+        // Non-matching key must be untouched.
+        let survivor: Option<u32> = cache.get_json("large:other:0").await.unwrap();
+        assert_eq!(survivor, Some(999), "non-matching key must survive");
+    }
+
+    /// Verifies that del_by_pattern returns 0 and does not error when no keys match.
+    #[tokio::test]
+    async fn del_by_pattern_no_matches_returns_zero() {
+        let (cache, _c) = start_cache().await;
+        let deleted = cache.del_by_pattern("nonexistent:*").await.unwrap();
+        assert_eq!(deleted, 0);
     }
 
     #[tokio::test]
