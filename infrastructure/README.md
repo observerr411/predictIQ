@@ -8,12 +8,20 @@ This directory contains all infrastructure definitions for PredictIQ using Terra
 infrastructure/
 ├── terraform/
 │   ├── main.tf              # Main configuration
-│   ├── variables.tf         # Variable definitions
+│   ├── variables.tf         # Variable definitions with validation
 │   ├── outputs.tf           # Output definitions
+│   ├── locals.tf            # Common tags and locals
+│   ├── bootstrap.sh         # Bootstrap script for state backend
+│   ├── backend-config.hcl   # Default backend configuration
 │   ├── environments/        # Environment-specific configurations
-│   │   ├── dev.tfvars
-│   │   ├── staging.tfvars
-│   │   └── prod.tfvars
+│   │   ├── README.md        # Environment separation documentation
+│   │   ├── dev.tfvars       # Development environment variables
+│   │   ├── staging/
+│   │   │   ├── terraform.tfvars
+│   │   │   └── backend.hcl
+│   │   └── production/
+│   │       ├── terraform.tfvars
+│   │       └── backend.hcl
 │   └── modules/             # Reusable modules
 │       ├── vpc/
 │       ├── rds/
@@ -75,21 +83,31 @@ terraform init -backend-config=backend-config.hcl
 terraform plan -var-file="environments/dev.tfvars"
 
 # For staging environment
-terraform plan -var-file="environments/staging.tfvars"
+terraform plan -var-file="environments/staging/terraform.tfvars"
 
 # For production environment
-terraform plan -var-file="environments/prod.tfvars"
+terraform plan -var-file="environments/production/terraform.tfvars"
 ```
 
 ### Apply Infrastructure Changes
 
 ```bash
 # Apply changes (requires approval)
-terraform apply -var-file="environments/prod.tfvars"
+terraform apply -var-file="environments/production/terraform.tfvars"
 
 # Auto-approve (use with caution)
-terraform apply -auto-approve -var-file="environments/prod.tfvars"
+terraform apply -auto-approve -var-file="environments/production/terraform.tfvars"
 ```
+
+## Environment Separation
+
+PredictIQ uses separate Terraform state files and backends for each environment:
+
+- **Development**: Local state (for testing only)
+- **Staging**: Remote state in S3 with DynamoDB locking
+- **Production**: Remote state in separate S3 bucket with DynamoDB locking
+
+See `environments/README.md` for detailed environment management instructions.
 
 ## Environments
 
