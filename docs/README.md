@@ -27,6 +27,10 @@ docs/
 
 ## 📖 Documentation Categories
 
+### Dashboard Management
+
+- **[Grafana Dashboard Provisioning](../performance/config/README.md#grafana-dashboard-provisioning)** - Version-controlled dashboard setup
+
 ### Distributed Tracing
 
 - **[Distributed Tracing Guide](./DISTRIBUTED_TRACING.md)** - OpenTelemetry setup and trace propagation
