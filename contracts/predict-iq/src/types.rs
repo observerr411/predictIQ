@@ -122,6 +122,8 @@ pub enum ConfigKey {
     UpgradeRejectedAt(soroban_sdk::BytesN<32>),
     GovernanceToken,
     MaxPushPayoutWinners,
+    CircuitBreakerThreshold,
+    PendingAdmin,
 }
 
 #[contracttype]
