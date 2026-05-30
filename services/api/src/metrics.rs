@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use prometheus::{Encoder, HistogramVec, IntCounterVec, Registry, TextEncoder};
+use prometheus::{Encoder, HistogramVec, IntCounterVec, IntGauge, Registry, TextEncoder};
 
 #[derive(Clone)]
 pub struct Metrics {
@@ -13,6 +13,7 @@ pub struct Metrics {
     rpc_errors: IntCounterVec,
     rpc_fallbacks: IntCounterVec,
     db_timeouts: IntCounterVec,
+    email_dlq_size: IntGauge,
 }
 
 impl Metrics {
@@ -70,6 +71,12 @@ impl Metrics {
         )
         .context("db_timeouts metric")?;
 
+        let email_dlq_size = IntGauge::new(
+            "email_dlq_size",
+            "Number of email jobs currently in the dead-letter queue",
+        )
+        .context("email_dlq_size metric")?;
+
         registry.register(Box::new(cache_hits.clone()))?;
         registry.register(Box::new(cache_misses.clone()))?;
         registry.register(Box::new(invalidations.clone()))?;
@@ -77,6 +84,7 @@ impl Metrics {
         registry.register(Box::new(rpc_errors.clone()))?;
         registry.register(Box::new(rpc_fallbacks.clone()))?;
         registry.register(Box::new(db_timeouts.clone()))?;
+        registry.register(Box::new(email_dlq_size.clone()))?;
 
         Ok(Self {
             registry,
@@ -87,6 +95,7 @@ impl Metrics {
             rpc_errors,
             rpc_fallbacks,
             db_timeouts,
+            email_dlq_size,
         })
     }
 
@@ -124,6 +133,10 @@ impl Metrics {
 
     pub fn observe_db_timeout(&self, operation: &str) {
         self.db_timeouts.with_label_values(&[operation]).inc();
+    }
+
+    pub fn set_dlq_size(&self, n: i64) {
+        self.email_dlq_size.set(n);
     }
 
     pub fn observe_tx_eviction(&self, count: u64) {

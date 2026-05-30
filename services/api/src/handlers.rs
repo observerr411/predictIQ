@@ -321,7 +321,7 @@ pub async fn newsletter_subscribe(
     tracing::info!(request_id, email = %email, source = %source, ip = %ip, "newsletter subscription attempt");
 
     Ok((
-        StatusCode::OK,
+        StatusCode::ACCEPTED,
         Json(NewsletterResponse {
             success: true,
             message: "Please check your email to confirm your subscription.".to_string(),
@@ -975,6 +975,8 @@ pub async fn email_queue_stats(
         .get_stats()
         .await
         .map_err(into_api_error)?;
+
+    state.metrics.set_dlq_size(stats.dead_letter as i64);
 
     Ok((StatusCode::OK, Json(stats)))
 }
