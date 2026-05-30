@@ -27,9 +27,10 @@ tests:
         values: '5+1x10'
     promql_expr_test:
       - expr: 'sum(rate(http_requests_total{status=~"2..|3.."}[5m])) / sum(rate(http_requests_total[5m])) * 100'
-        expected_samples:
+        eval_time: 5m
+        exp_samples:
           - labels: '{}'
-            value: '99'
+            value: 99
 
   - interval: 1h
     input_series:
@@ -39,9 +40,10 @@ tests:
         values: '36+1x24'
     promql_expr_test:
       - expr: 'slo:api_availability:success_rate'
-        expected_samples:
+        eval_time: 1h
+        exp_samples:
           - labels: '{}'
-            value: '99'
+            value: 99
 
   - interval: 1m
     input_series:
@@ -51,9 +53,10 @@ tests:
         values: '100+0x10'
     promql_expr_test:
       - expr: 'sum(rate(http_requests_total{status=~"2..|3.."}[5m])) / sum(rate(http_requests_total[5m])) * 100'
-        expected_samples:
+        eval_time: 5m
+        exp_samples:
           - labels: '{}'
-            value: '50'
+            value: 50
 
   - interval: 1m
     input_series:
@@ -63,9 +66,10 @@ tests:
         values: '100+0x10'
     promql_expr_test:
       - expr: 'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) <= 0.2'
-        expected_samples:
+        eval_time: 5m
+        exp_samples:
           - labels: '{}'
-            value: '1'
+            value: 1
 
   - interval: 1m
     input_series:
@@ -75,9 +79,10 @@ tests:
         values: '0+0x10'
     promql_expr_test:
       - expr: 'sum(rate(redis_commands_total{status="success"}[5m])) / sum(rate(redis_commands_total[5m])) * 100'
-        expected_samples:
+        eval_time: 5m
+        exp_samples:
           - labels: '{}'
-            value: '100'
+            value: 100
 
   - interval: 1m
     input_series:
@@ -86,9 +91,9 @@ tests:
       - series: 'http_requests_total{status="500"}'
         values: '1+0x10'
     alert_rule_test:
-      - alert_rule_name: 'SLOFastBurn'
-        eval_time: '10m'
-        expected_alerts:
+      - alertname: 'SLOFastBurn'
+        eval_time: 10m
+        exp_alerts:
           - exp_labels:
               severity: 'critical'
               slo: 'api_availability'
@@ -102,9 +107,9 @@ tests:
       - series: 'http_requests_total{status="500"}'
         values: '100+0x10'
     alert_rule_test:
-      - alert_rule_name: 'SLOErrorBudgetExhausted'
-        eval_time: '10m'
-        expected_alerts:
+      - alertname: 'SLOErrorBudgetExhausted'
+        eval_time: 10m
+        exp_alerts:
           - exp_labels:
               severity: 'critical'
               slo: 'api_availability'
