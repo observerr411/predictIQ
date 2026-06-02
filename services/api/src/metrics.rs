@@ -156,6 +156,7 @@ impl Metrics {
         }
     }
 
+
     pub fn observe_request(&self, route: &str, status_code: &str, duration: Duration) {
         self.request_latency
             .with_label_values(&[route, status_code])
@@ -185,6 +186,7 @@ impl Metrics {
                 .inc_by(count);
         }
     }
+
 
     /// Update connection pool utilisation gauges.
     /// Call this on each pool event (connection acquired, released, opened, closed).
