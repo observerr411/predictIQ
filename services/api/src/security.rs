@@ -301,7 +301,7 @@ impl ApiKeyAuth {
     }
 
     pub fn verify(&self, key: &str) -> bool {
-        self.valid_keys.is_empty() || self.valid_keys.iter().any(|k| k == key)
+        !self.valid_keys.is_empty() && self.valid_keys.iter().any(|k| k == key)
     }
 }
 

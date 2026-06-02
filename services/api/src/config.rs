@@ -501,6 +501,14 @@ impl Config {
             errors.push("HMAC_KEY: environment variable is not set or is empty".to_string());
         }
 
+        // Warn if no API keys are configured — admin endpoints will reject all requests.
+        if self.api_keys.is_empty() {
+            eprintln!(
+                "Warning: API_KEYS is not set. All admin endpoint requests will return 401. \
+                 Set API_KEYS to a comma-separated list of valid keys."
+            );
+        }
+
         if !errors.is_empty() {
             for error in &errors {
                 eprintln!("Configuration error: {}", error);

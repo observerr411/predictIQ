@@ -564,6 +564,140 @@ paths:
         "500":
           $ref: "#/components/responses/ApiError"
 
+  /api/blockchain/replay:
+    post:
+      tags: [blockchain]
+      operationId: blockchainReplay
+      summary: Replay blockchain events (admin)
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Replay result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnyObject"
+        "400":
+          $ref: "#/components/responses/ApiError"
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "403":
+          $ref: "#/components/responses/ApiError"
+        "429":
+          $ref: "#/components/responses/ApiError"
+        "500":
+          $ref: "#/components/responses/ApiError"
+
+  /api/v1/email/queue/dead-letter:
+    get:
+      tags: [email]
+      operationId: getEmailDeadLetterList
+      summary: List dead-letter email jobs (admin)
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Dead-letter job list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnyObject"
+        "400":
+          $ref: "#/components/responses/ApiError"
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "403":
+          $ref: "#/components/responses/ApiError"
+        "429":
+          $ref: "#/components/responses/ApiError"
+        "500":
+          $ref: "#/components/responses/ApiError"
+
+  /api/v1/email/queue/dead-letter/{job_id}/requeue:
+    post:
+      tags: [email]
+      operationId: requeueEmailDeadLetterJob
+      summary: Requeue a dead-letter email job (admin)
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Dead-letter job identifier
+      responses:
+        "200":
+          description: Requeue result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnyObject"
+        "400":
+          $ref: "#/components/responses/ApiError"
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "403":
+          $ref: "#/components/responses/ApiError"
+        "404":
+          $ref: "#/components/responses/ApiError"
+        "429":
+          $ref: "#/components/responses/ApiError"
+        "500":
+          $ref: "#/components/responses/ApiError"
+
+  /api/v1/audit/logs:
+    get:
+      tags: [audit]
+      operationId: getAuditLogs
+      summary: Retrieve audit log entries (admin)
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnyObject"
+        "400":
+          $ref: "#/components/responses/ApiError"
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "403":
+          $ref: "#/components/responses/ApiError"
+        "429":
+          $ref: "#/components/responses/ApiError"
+        "500":
+          $ref: "#/components/responses/ApiError"
+
+  /api/v1/audit/statistics:
+    get:
+      tags: [audit]
+      operationId: getAuditStatistics
+      summary: Retrieve audit event statistics (admin)
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Audit statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnyObject"
+        "400":
+          $ref: "#/components/responses/ApiError"
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "403":
+          $ref: "#/components/responses/ApiError"
+        "429":
+          $ref: "#/components/responses/ApiError"
+        "500":
+          $ref: "#/components/responses/ApiError"
+
   /webhooks/sendgrid:
     post:
       tags: [webhooks]
