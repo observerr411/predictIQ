@@ -9,10 +9,6 @@ pub const MAX_DISPUTE_WINDOW_SECONDS: u64 = 30 * 24 * 60 * 60; // 30 days
 const VOTING_PERIOD_SECONDS: u64 = 259200; // 72 hours
 const MAJORITY_THRESHOLD_BPS: i128 = 6000; // 60%
 
-pub fn get_dispute_window() -> u64 {
-    DEFAULT_DISPUTE_WINDOW_SECONDS
-}
-
 pub fn get_default_dispute_window(e: &Env) -> u64 {
     e.storage()
         .persistent()
@@ -244,5 +240,30 @@ fn calculate_voting_outcome(e: &Env, market: &crate::types::Market) -> Result<u3
         Ok(max_outcome)
     } else {
         Err(ErrorCode::NoMajorityReached)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::Env;
+
+    /// Default dispute window returns DEFAULT_DISPUTE_WINDOW_SECONDS when no
+    /// admin-configured value is stored.
+    #[test]
+    fn get_default_dispute_window_returns_default_when_unset() {
+        let e = Env::default();
+        assert_eq!(get_default_dispute_window(&e), DEFAULT_DISPUTE_WINDOW_SECONDS);
+    }
+
+    /// Admin-configured dispute window is returned after set_dispute_window.
+    #[test]
+    fn get_default_dispute_window_returns_configured_value() {
+        let e = Env::default();
+        // Bypass admin check by writing directly to storage.
+        e.storage()
+            .persistent()
+            .set(&crate::types::ConfigKey::DefaultDisputeWindow, &7_200u64);
+        assert_eq!(get_default_dispute_window(&e), 7_200u64);
     }
 }
